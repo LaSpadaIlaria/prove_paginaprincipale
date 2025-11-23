@@ -1,5 +1,5 @@
 // ===== CONFIGURAZIONE =====
-const CONFIG = { //qui ho inserito la palette colori
+const CONFIG = {
     colors: {
         background: '#000000',
         text: '#FFFFFF',
@@ -13,13 +13,13 @@ const CONFIG = { //qui ho inserito la palette colori
         selectedContinent: '#ff440057'
     },
     layout: {
-        centerXRatio: 0.5, //non accetta valori assoluti come windowidth / 2 quindi si dà un valore tra 0 e 1 in questo caso visto che lo voglio centrato metto 0.5
+        centerXRatio: 0.5,
         maxRadius: 380,
         minRadius: 20,
-        timelineWidth: 150, //posizione della timeline
+        timelineWidth: 150,
         infoBoxWidth: 300
     },
-    centuries: [ //decido di selezionare tutti i secoli di interesse
+    centuries: [
         { label: 'tutti i secoli', value: null },
         { label: '4000 a.C.', value: -4000 },
         { label: '2000 a.C.', value: -2000 },
@@ -34,157 +34,88 @@ const CONFIG = { //qui ho inserito la palette colori
 };
 
 // ===== STATO APPLICAZIONE =====
-let state = { //Serve per mantenere lo stato corrente dell’interfaccia, così ogni funzione di rendering o interazione può usarlo e aggiornarlo senza calcolare tutto da zero
-    volcanoData: [], // Tutti i dati dei vulcani
-    filteredData: [], //Contiene solo i vulcani filtrati secondo le scelte dell’utente.
-    selectedCentury: null, //Memorizza il secolo selezionato nella timeline.1700 se utente clicca sul XVIII secolo, null se non seleziona niente
-    selectedContinent: null, //Memorizza il continente selezionato dall’utente.
-    hoveredVolcano: null, //Memorizza il vulcano su cui il mouse sta passando.
-    timelineYear: null, //Indica l'anno esatto in cui si trova la linea della timeline. indica l'anno preciso
-    centerX: 0, //La posizione del centro del cerchio (la mappa radiale dove posizioni i vulcani).
+let state = {
+    volcanoData: [],
+    filteredData: [],
+    selectedCentury: null,
+    selectedContinent: null,
+    hoveredVolcano: null,
+    timelineYear: null,
+    centerX: 0,
     centerY: 0,
-    continentAngles: {}, //aiuta a legare ogni continente a un angolo della visualizzazione radiale.in questo modo poi mi è comodo per le etichette e cose del genere
-    continentCounts: {}, //Contiene quante eruzioni per continente ci sono nei dati filtrati.
-    volcanoPositions: new Map() //Map che contiene la posizione esatta (x,y) di ogni vulcano nella rappresentazione. in pratica è perchè non devi ricalcolare ogni frame dove sta ogni vulcano: lo calcoli una volta e lo salvi.
+    continentAngles: {},
+    continentCounts: {},
+    volcanoPositions: new Map(),
+    globalYearRange: { min: 0, max: 0 }
 };
 
 // ===== MAPPATURA CONTINENTI =====
-// Mappatura delle località geografiche ai continenti
 const CONTINENT_MAP = {
-  // ASIA (21 località)
-  'Arabia-S': 'Asia',
-  'Arabia-W': 'Asia',
-  'China-S': 'Asia',
-  'Halmahera-Indonesia': 'Asia',
-  'Hokkaido-Japan': 'Asia',
-  'Honshu-Japan': 'Asia',
-  'Indonesia': 'Asia',
-  'Izu Is-Japan': 'Asia',
-  'Java': 'Asia',
-  'Kamchatka': 'Asia',
-  'Kuril Is': 'Asia',
-  'Kyushu-Japan': 'Asia',
-  'Lesser Sunda Is': 'Asia',
-  'Luzon-Philippines': 'Asia',
-  'Mindanao-Philippines': 'Asia',
-  'Philippines-C': 'Asia',
-  'Ryukyu Is': 'Asia',
-  'Sangihe Is-Indonesia': 'Asia',
-  'Sulawesi-Indonesia': 'Asia',
-  'Sumatra': 'Asia',
-  'Turkey': 'Asia',
-  
-  // AMERICHE (20 località)
-  'Alaska Peninsula': 'Americhe',
-  'Alaska-SW': 'Americhe',
-  'Aleutian Is': 'Americhe',
-  'Canada': 'Americhe',
-  'Chile-C': 'Americhe',
-  'Chile-S': 'Americhe',
-  'Colombia': 'Americhe',
-  'Costa Rica': 'Americhe',
-  'Ecuador': 'Americhe',
-  'El Salvador': 'Americhe',
-  'Galapagos': 'Americhe',
-  'Guatemala': 'Americhe',
-  'Hawaiian Is': 'Americhe',
-  'Mexico': 'Americhe',
-  'Nicaragua': 'Americhe',
-  'Peru': 'Americhe',
-  'US-Oregon': 'Americhe',
-  'US-Washington': 'Americhe',
-  'US-Wyoming': 'Americhe',
-  'W Indies': 'Americhe',
-  
-  // EUROPA (8 località)
-  'Azores': 'Europa',
-  'Canary Is': 'Europa',
-  'Greece': 'Europa',
-  'Iceland-NE': 'Europa',
-  'Iceland-S': 'Europa',
-  'Iceland-SE': 'Europa',
-  'Iceland-SW': 'Europa',
-  'Italy': 'Europa',
-  
-  // OCEANIA (13 località)
-  'Admiralty Is-SW Paci': 'Oceania',
-  'Banda Sea': 'Oceania',
-  'Bougainville-SW Paci': 'Oceania',
-  'Kermadec Is': 'Oceania',
-  'New Britain-SW Pac': 'Oceania',
-  'New Guinea': 'Oceania',
-  'New Guinea-NE of': 'Oceania',
-  'New Zealand': 'Oceania',
-  'Samoa-SW Pacific': 'Oceania',
-  'Santa Cruz Is-SW Pac': 'Oceania',
-  'Solomon Is-SW Pacifi': 'Oceania',
-  'Tonga-SW Pacific': 'Oceania',
-  'Vanuatu-SW Pacific': 'Oceania',
-  
-  // AFRICA (7 località)
-  'Africa-C': 'Africa',
-  'Africa-E': 'Africa',
-  'Africa-NE': 'Africa',
-  'Africa-W': 'Africa',
-  'Cape Verde Is': 'Africa',
-  'Indian O-W': 'Africa',
-  'Red Sea': 'Africa'
+    // ASIA
+    'Arabia-S': 'Asia', 'Arabia-W': 'Asia', 'China-S': 'Asia', 'Halmahera-Indonesia': 'Asia',
+    'Hokkaido-Japan': 'Asia', 'Honshu-Japan': 'Asia', 'Indonesia': 'Asia', 'Izu Is-Japan': 'Asia',
+    'Java': 'Asia', 'Kamchatka': 'Asia', 'Kuril Is': 'Asia', 'Kyushu-Japan': 'Asia',
+    'Lesser Sunda Is': 'Asia', 'Luzon-Philippines': 'Asia', 'Mindanao-Philippines': 'Asia',
+    'Philippines-C': 'Asia', 'Ryukyu Is': 'Asia', 'Sangihe Is-Indonesia': 'Asia',
+    'Sulawesi-Indonesia': 'Asia', 'Sumatra': 'Asia', 'Turkey': 'Asia',
+    
+    // AMERICHE
+    'Alaska Peninsula': 'Americhe', 'Alaska-SW': 'Americhe', 'Aleutian Is': 'Americhe',
+    'Canada': 'Americhe', 'Chile-C': 'Americhe', 'Chile-S': 'Americhe', 'Colombia': 'Americhe',
+    'Costa Rica': 'Americhe', 'Ecuador': 'Americhe', 'El Salvador': 'Americhe', 'Galapagos': 'Americhe',
+    'Guatemala': 'Americhe', 'Hawaiian Is': 'Americhe', 'Mexico': 'Americhe', 'Nicaragua': 'Americhe',
+    'Peru': 'Americhe', 'US-Oregon': 'Americhe', 'US-Washington': 'Americhe', 'US-Wyoming': 'Americhe',
+    'W Indies': 'Americhe',
+    
+    // EUROPA
+    'Azores': 'Europa', 'Canary Is': 'Europa', 'Greece': 'Europa', 'Iceland-NE': 'Europa',
+    'Iceland-S': 'Europa', 'Iceland-SE': 'Europa', 'Iceland-SW': 'Europa', 'Italy': 'Europa',
+    
+    // OCEANIA
+    'Admiralty Is-SW Paci': 'Oceania', 'Banda Sea': 'Oceania', 'Bougainville-SW Paci': 'Oceania',
+    'Kermadec Is': 'Oceania', 'New Britain-SW Pac': 'Oceania', 'New Guinea': 'Oceania',
+    'New Guinea-NE of': 'Oceania', 'New Zealand': 'Oceania', 'Samoa-SW Pacific': 'Oceania',
+    'Santa Cruz Is-SW Pac': 'Oceania', 'Solomon Is-SW Pacifi': 'Oceania', 'Tonga-SW Pacific': 'Oceania',
+    'Vanuatu-SW Pacific': 'Oceania',
+    
+    // AFRICA
+    'Africa-C': 'Africa', 'Africa-E': 'Africa', 'Africa-NE': 'Africa', 'Africa-W': 'Africa',
+    'Cape Verde Is': 'Africa', 'Indian O-W': 'Africa', 'Red Sea': 'Africa'
 };
 
-// array semplice dei continenti. è più comodo da usare dopo, forse melo laborioso
 const CONTINENTS = ['Asia', 'Americhe', 'Europa', 'Oceania', 'Africa'];
 
-// Funzione helper per ottenere il continente da una località
-function getContinent(location) {
-  return CONTINENT_MAP[location] || 'Sconosciuto';
-}
- 
-
-// ===== INIZIAMO =====
+// ===== INIZIALIZZAZIONE =====
 function preload() {
-    loadTable('assets/data_impatto.csv', 'csv', 'header', 
-        function(table) {
-            state.volcanoData = processTableData(table);
-            initializeData();
-        }
-    );
+    loadTable('assets/data_impatto.csv', 'csv', 'header', processTableData);
 }
-//da qui in poi i passaggi sono numerati così è più chiaro, anche perchè poi nelle modifiche mi ricordo dove andare a modificare le cose
 
 function processTableData(table) {
-    let data = [];
+    state.volcanoData = [];
     for (let r = 0; r < table.getRowCount(); r++) {
         let row = table.getRow(r);
-        let location = row.getString('Location'); //Prende il valore della colonna “Location” per quella riga.
-        let continent = CONTINENT_MAP[location] //Converte la località in continente usando la mappa CONTINENT_MAP.
+        let location = row.getString('Location');
         
-        data.push({ //Crea un oggetto vulcano con tutte le proprietà chiave:
-            year: parseInt(row.getString('Year')),
+        state.volcanoData.push({
+            year: parseInt(row.getString('Year')) || 0,
             name: row.getString('Name'),
             location: location,
             country: row.getString('Country'),
             type: row.getString('Type'),
             impact: parseInt(row.getString('Impact')) || 1,
-            continent: continent
+            continent: CONTINENT_MAP[location] || 'Sconosciuto'
         });
     }
-    return data.sort((a, b) => b.year - a.year); //Ordina l’array dal vulcano più recente al più antico (decrescente). mi è utile per dopo questa roba
+    
+    state.volcanoData.sort((a, b) => b.year - a.year);
+    initializeData();
 }
 
-
-function initializeData() { // 1 Serve per preparare tutti i dati necessari alla visualizzazione prima di disegnare qualsiasi cosa
-    
-    // Copia tutta la lista originale dei vulcani nei dati filtrati
+function initializeData() {
     state.filteredData = [...state.volcanoData];
-
-    // Calcola le proporzioni degli spazi dei continenti (punto 2)
-    calculateContinentData();
-
-    // Calcola la posizione grafica di ogni vulcano (punto 3)
-    calculateVolcanoPositions();
-
-    // Imposta il range generale degli anni da usare nella timeline o filtri
     state.globalYearRange = getGlobalYearRange();
+    calculateContinentData();
+    calculateVolcanoPositions();
 }
 
 function setup() {
@@ -198,25 +129,23 @@ function updateLayout() {
 }
 
 // ===== CALCOLI =====
-function calculateContinentData() { // 2 mi aiuta a capire lo spazio per ogni continente
-    // Inizializza i contatori quindi crea/azzera l'oggetto state.continentCounts e imposta un contatore a 0 per ogni continente definito in CONTINENTS.
-    state.continentCounts = {};
-    CONTINENTS.forEach(cont => state.continentCounts[cont] = 0);
+function calculateContinentData() {
+    state.continentCounts = CONTINENTS.reduce((acc, cont) => {
+        acc[cont] = 0;
+        return acc;
+    }, {});
     
-    //Conta i vulcani per continente usando TUTTO il dataset. lo faccio su tutto il dataset perchè gli spicchi rimangono costanti anche se applichi filtri; solo i punti dentro gli spicchi cambieranno. diciamo che è sbatta fare in modo che cambi. cioè se più avanti capisco bene come si fa posso anche provarci, ma per ora lo mantengo fisso
     state.volcanoData.forEach(v => {
         if (state.continentCounts[v.continent] !== undefined) {
             state.continentCounts[v.continent]++;
         }
     });
     
-    //total contiene il numero totale di record nel dataset completo; startAngle è l'angolo corrente da cui partire a disegnare il primo spicchio.
     let total = state.volcanoData.length;
     let startAngle = 0;
     
-    //Calcola proporzioni e angoli degli spicchi
     state.continentAngles = {};
-    CONTINENTS.forEach(cont => { //calcola la proportion (percentuale) di ogni continente rispetto al totale; converte la percentuale in angleSize (radianti) moltiplicando per TWO_PI (intero cerchio); salva per ogni continente: start, end e mid (quest’ultimo utile per posizionare etichette o per calcolare posizioni “centrali”). aggiorna startAngle per il continente successivo.
+    CONTINENTS.forEach(cont => {
         let proportion = total > 0 ? state.continentCounts[cont] / total : 0;
         let angleSize = proportion * TWO_PI;
         
@@ -230,43 +159,48 @@ function calculateContinentData() { // 2 mi aiuta a capire lo spazio per ogni co
     });
 }
 
-
+// MODIFICA CRUCIALE: Calcoliamo le posizioni dei vulcani UNA SOLA VOLTA all'inizializzazione
+// e non ogni volta che applichiamo i filtri. Questo garantisce che le posizioni rimangano consistenti.
 function calculateVolcanoPositions() {
-    console.log("Vulcani con posizione assegnata:", state.filteredData.filter(v => state.volcanoPositions.has(v.name + v.year)).length);
-    // resettiamo le posizioni ad ogni filtro
-
-     state.filteredData.forEach(v => {
+    state.volcanoPositions.clear();
+    
+    // MODIFICA: Usiamo state.volcanoData (tutti i dati) invece di state.filteredData
+    // in modo che le posizioni siano calcolate una volta per tutte e non cambino con i filtri
+    state.volcanoData.forEach(v => {
         let key = v.name + v.year;
-        // Se non esiste ancora la posizione, la generiamo
-        if (!state.volcanoPositions.has(key)) {
-            let angles = state.continentAngles[v.continent];
-            if (angles) {
-                let randomAngle = random(angles.start, angles.end);
-                state.volcanoPositions.set(key, randomAngle);
-            }
+        let angles = state.continentAngles[v.continent];
+        if (angles && !state.volcanoPositions.has(key)) {
+            // Assegniamo un angolo casuale ma FISSO per ogni vulcano all'interno del suo continente
+            state.volcanoPositions.set(key, random(angles.start, angles.end));
         }
     });
 }
 
 function applyFilters() {
-    state.filteredData = [...state.volcanoData];
+    state.filteredData = state.volcanoData.filter(v => {
+        const centuryMatch = state.selectedCentury === null || 
+                           (v.year >= state.selectedCentury && v.year < state.selectedCentury + 100);
+        const continentMatch = state.selectedContinent === null || 
+                             v.continent === state.selectedContinent;
+        return centuryMatch && continentMatch;
+    });
 
-    if (state.selectedCentury !== null) {
-        let centuryStart = state.selectedCentury;
-        let centuryEnd = state.selectedCentury + 100;
-        state.filteredData = state.filteredData.filter(v => v.year >= centuryStart && v.year < centuryEnd);
-    }
-
-    if (state.selectedContinent !== null) {
-        state.filteredData = state.filteredData.filter(v => v.continent === state.selectedContinent);
-    }
-
-    calculateContinentData(); // aggiorna angoli spicchi
+    calculateContinentData();
+    // MODIFICA IMPORTANTE: Rimossa la chiamata a calculateVolcanoPositions()
+    // Le posizioni dei vulcani rimangono quelle calcolate all'inizializzazione
+    // state.timelineYear = null; // Nota: questa riga era commentata nel codice originale?
     state.timelineYear = null;
 }
 
+function getGlobalYearRange() {
+    const years = state.volcanoData.map(v => v.year);
+    return {
+        min: Math.min(...years),
+        max: Math.max(...years)
+    };
+}
 
-//==== DISEGNAMOOOO ====//
+// ===== RENDERING =====
 function draw() {
     background(CONFIG.colors.background);
     updateLayout();
@@ -286,65 +220,55 @@ function drawTitle() {
     textSize(48);
     textAlign(LEFT, TOP);
     textFont('Arial');
-    text('ERUZIONI', 60, 60);
-    text('VULCANICHE', 60, 110);
+    text('ERUZIONI\nVULCANICHE', 60, 60);
 }
-//COSE PER IL RETTANGOLINO
+
 function drawInfoBox() {
-    let boxX = 60;
-    let boxY = 440;
-    let boxW = CONFIG.layout.infoBoxWidth;
-    let boxH = 200;
+    const boxX = 60, boxY = 440;
+    const boxW = CONFIG.layout.infoBoxWidth, boxH = 200;
     
-    // Box background
     fill(CONFIG.colors.infoBox);
     stroke(CONFIG.colors.accent);
     strokeWeight(0.5);
     rect(boxX, boxY, boxW, boxH, 10, 10, 0, 0);
     
-    // Titolo
     fill(CONFIG.colors.accent);
     noStroke();
     textSize(16);
-    textAlign(LEFT, TOP);
     text('informazioni:', boxX + 30, boxY + 20);
     
-    // Contenuto
     fill(CONFIG.colors.text);
-    textSize(14);
-    textAlign(LEFT, TOP);
-    
     if (state.hoveredVolcano) {
-        drawVolcanoInfo(boxX, boxY); //vedi dopo
+        drawVolcanoInfo(boxX, boxY);
     } else {
-        text('Seleziona un', boxX + 30, boxY + 80);
-        text('vulcano', boxX + 30, boxY + 105);
+        textSize(14);
+        text('Seleziona un\nvulcano', boxX + 30, boxY + 80);
     }
 }
 
 function drawVolcanoInfo(boxX, boxY) {
-    let v = state.hoveredVolcano;
+    const v = state.hoveredVolcano;
+    const infoLines = [
+        { label: 'ultima eruzione', value: formatYear(v.year) },
+        { label: 'paese', value: v.country || 'N/A' },
+        { label: 'tipo', value: v.type || 'N/A' },
+        { label: 'conseguenze', value: v.impact || '1' }
+    ];
+    
+    textSize(14);
     text(v.name, boxX + 30, boxY + 60);
     
     textSize(12);
-    text('ultima eruzione', boxX + 30, boxY + 90);
-    text(formatYear(v.year), boxX + 200, boxY + 90);
-    
-    text('paese', boxX + 30, boxY + 115);
-    text(v.country || 'N/A', boxX + 200, boxY + 115);
-    
-    text('tipo', boxX + 30, boxY + 140);
-    text(v.type || 'N/A', boxX + 200, boxY + 140);
-    
-    text('conseguenze', boxX + 30, boxY + 165);
-    text(v.impact || '1', boxX + 200, boxY + 165);
+    infoLines.forEach((line, i) => {
+        const yPos = boxY + 90 + (i * 25);
+        text(line.label, boxX + 30, yPos);
+        text(line.value, boxX + 200, yPos);
+    });
 }
 
 function drawCenturySelector() {
-    let boxX = 60;
-    let boxY = 640;
-    let boxW = CONFIG.layout.infoBoxWidth;
-    let boxH = 220;
+    const boxX = 60, boxY = 640;
+    const boxW = CONFIG.layout.infoBoxWidth, boxH = 220;
     
     fill(CONFIG.colors.infoBox);
     stroke(CONFIG.colors.accent);
@@ -354,31 +278,25 @@ function drawCenturySelector() {
     fill(CONFIG.colors.accent);
     noStroke();
     textSize(16);
-    textAlign(LEFT, TOP);
     text('seleziona secolo:', boxX + 30, boxY + 23);
     
     drawCenturyCheckboxes(boxX, boxY);
 }
 
 function drawCenturyCheckboxes(boxX, boxY) {
-    let checkY = boxY + 60;
-    let checkSpacing = 30;
-    let column1X = boxX + 30;
-    let column2X = boxX + 180;
+    const checkY = boxY + 60;
+    const checkSpacing = 30;
     
     textSize(11);
     fill(CONFIG.colors.text);
-    noStroke();
     
     CONFIG.centuries.forEach((century, i) => {
-        let column = i < 5 ? column1X : column2X;
-        let row = i < 5 ? i : i - 5;
-        let cy = checkY + row * checkSpacing;
-        let isSelected = (century.value === state.selectedCentury);
+        const column = i < 5 ? boxX + 30 : boxX + 180;
+        const row = i < 5 ? i : i - 5;
+        const cy = checkY + row * checkSpacing;
+        const isSelected = (century.value === state.selectedCentury);
         
         drawCheckbox(column, cy, isSelected);
-        fill('#FFFFFF'); 
-        noStroke()
         text(century.label, column + 20, cy + 3);
     });
 }
@@ -396,49 +314,35 @@ function drawCheckbox(x, y, isSelected) {
         line(x + 6, y + 11, x + 12, y + 4);
     }
 }
-//DISEGNAMO IL CERCHIO
-function drawMainCircle() { //vabbè in pratica gli diciamo di centrare il centro al centro in modo che le trasformazioni dopo siano giuste
+
+function drawMainCircle() {
     push();
     translate(state.centerX, state.centerY);
     
-    if (state.filteredData.length === 0) {
-        pop();
-        return;
+    // SEMPRE disegna questi elementi, anche quando non ci sono vulcani filtrati
+    drawSelectedContinentSlice();
+    drawConcentricCircles();
+    drawContinentDividers();
+    
+    // Disegna i vulcani solo se ce ne sono
+    if (state.filteredData.length > 0) {
+        drawVolcanoes();
     }
     
-    let yearRange = state.globalYearRange; //vedi punto 5
-    drawSelectedContinentSlice(); //vedi punto 6
-    drawConcentricCircles(yearRange); //vedi punto 7
-    drawContinentDividers(); //vedi punto 8
-    drawVolcanoes(yearRange);// vedi punto 9
-    
     pop();
-    checkHover();
+    
+    // Controlla hover solo se ci sono vulcani
+    if (state.filteredData.length > 0) {
+        checkHover();
+    } else {
+        state.hoveredVolcano = null; // Reset hover se non ci sono vulcani
+    }
 }
 
-// Questa funzione analizza TUTTI i vulcani per trovare l'anno minimo e massimo
-function getGlobalYearRange() {
-    const years = state.volcanoData.map(v => v.year);
-
-    const minYear = Math.min(...years);
-    const maxYear = Math.max(...years);
-
-    return { min: minYear, max: maxYear };
-}
-
-function getYearRange() { // 5 Crea un array di tutti gli anni dei vulcani filtrati. Restituisce un oggetto {min, max} con l’anno più vecchio e quello più recente. Serve per sapere dove posizionare i cerchi concentrici e i punti dei vulcani sul grafico.
-    let years = state.filteredData.map(v => v.year);
-    return {
-        min: Math.min(...years),
-        max: Math.max(...years)
-    };
-}
-
-
-function drawSelectedContinentSlice() { //6 per il colorino quando seleziono i continenti
-    if (state.selectedContinent) { //vedo se è stato selezionato il continente
-        let angles = state.continentAngles[state.selectedContinent]; //Qui recuper0 i valori start ed end del continente selezionato
-        if (angles && angles.start !== angles.end) { // <-- evita cerchi e Controllo se il settore esiste davvero 
+function drawSelectedContinentSlice() {
+    if (state.selectedContinent) {
+        const angles = state.continentAngles[state.selectedContinent];
+        if (angles && angles.start !== angles.end) {
             fill(CONFIG.colors.selectedContinent);
             noStroke();
             arc(0, 0, CONFIG.layout.maxRadius * 2, CONFIG.layout.maxRadius * 2, 
@@ -447,89 +351,81 @@ function drawSelectedContinentSlice() { //6 per il colorino quando seleziono i c
     }
 }
 
-function drawConcentricCircles(yearRange) {
-    // Lista personalizzata di anni per i cerchi
-    let customYears = [-4000, -2000, 0, 1000, 1600, 1700, 1800, 1900, 2000];
+function drawConcentricCircles() {
+    const customYears = [-4000, -2000, 0, 1000, 1600, 1700, 1800, 1900, 2000];
+    const n = customYears.length;
+    const radiusStep = (CONFIG.layout.maxRadius - CONFIG.layout.minRadius) / (n - 1);
 
     stroke(CONFIG.colors.circle);
     strokeWeight(0.5);
     noFill();
 
-    let n = customYears.length; // numero di cerchi
-    // distanza costante tra cerchi
-    let radiusStep = (CONFIG.layout.maxRadius - CONFIG.layout.minRadius) / (n - 1);
-
-    for (let i = 0; i < n; i++) {
-        let y = customYears[i]; // anno corrente
-        let r = CONFIG.layout.minRadius + i * radiusStep; // distanza costante
-
+    customYears.forEach((year, i) => {
+        const r = CONFIG.layout.minRadius + i * radiusStep;
         circle(0, 0, r * 2);
 
-        // scrivi l’anno accanto al cerchio
         push();
         rotate(PI * 2);
         fill(CONFIG.colors.text);
         noStroke();
         textSize(10);
         textAlign(CENTER, BOTTOM);
-        text(formatYear(y), 0, -r - 5);
+        text(formatYear(year), 0, -r - 5);
         pop();
-    }
+    });
 }
 
-
-function drawContinentDividers() { //disegna le linee che separano i "settori" dei continenti nel cerchio principale
+function drawContinentDividers() {
+    stroke(CONFIG.colors.circle);
+    strokeWeight(1);
+    
     CONTINENTS.forEach(cont => {
-        let angles = state.continentAngles[cont];
-        if (!angles) return;
-        
-        stroke(CONFIG.colors.circle);
-        strokeWeight(1);
-        line(0, 0, cos(angles.start) * CONFIG.layout.maxRadius, sin(angles.start) * CONFIG.layout.maxRadius);
-    });
-}
-
-function drawVolcanoes(yearRange) { //disegna ogni vulcano come pallino sul cerchio principale
-    console.log("Numero di vulcani da disegnare:", state.filteredData.length);
-   // Disegna solo i vulcani filtrati
-    state.filteredData.forEach(v => {
-        // Recupera l'angolo fisso già calcolato a partire dal dataset completo
-        let angle = state.volcanoPositions.get(v.name + v.year);
-
-        // Se per qualche motivo non c'è angolo, usa il centro del settore
-        let angles = state.continentAngles[v.continent];
-        if (!angle) angle = angles.mid;
-
-        // Raggio basato sugli anni globali, non filtrati
-        let r = map(v.year, state.globalYearRange.min, state.globalYearRange.max,
-                    CONFIG.layout.minRadius, CONFIG.layout.maxRadius);
-
-        let x = cos(angle) * r;
-        let y = sin(angle) * r;
-
-        let isHighlighted = (state.timelineYear !== null && v.year === state.timelineYear);
-        let isHovered = (state.hoveredVolcano === v);
-
-        drawVolcanoGlow(v, x, y, isHighlighted, isHovered);
-        drawVolcanoDot(v, x, y, isHighlighted, isHovered);
-    });
-}
-
-function drawVolcanoGlow(volcano, x, y, isHighlighted, isHovered) { //disegna quello schifoso glow che mi ha fatto uscire di testa :)
-    if (isHighlighted || isHovered) { //viene attivato solo se ci passi sopra con il mouse
-        let glowSize = map(volcano.impact, 5, 15, 35, 55); //onverte l’impatto del vulcano (1-16) in una dimensione del glow da 10 a 40 px.
-        let alpha = map(volcano.impact, 5, 15, 33, 55); //converte l’impatto in trasparenza (alpha) del bagliore.
-        
-        for (let i = glowSize; i > 0; i -= 2) { //crea vcerchi concentrici
-            fill(255, 69, 0, alpha);
-            noStroke();
-            circle(x, y, i);
-
+        const angles = state.continentAngles[cont];
+        if (angles) {
+            line(0, 0, 
+                 cos(angles.start) * CONFIG.layout.maxRadius, 
+                 sin(angles.start) * CONFIG.layout.maxRadius);
         }
-    }
+    });
 }
 
-function drawVolcanoDot(volcano, x, y, isHighlighted, isHovered) { //disegna il pallino che rappresenta l'eruzione
+function drawVolcanoes() {
+    state.filteredData.forEach(v => {
+        // MODIFICA: Recuperiamo la posizione dalla mappa calcolata all'inizializzazione
+        // Questo garantisce che la posizione rimanga la stessa anche quando applichiamo filtri
+        let angle = state.volcanoPositions.get(v.name + v.year);
+        const angles = state.continentAngles[v.continent];
+        
+        // Se per qualche motivo non esiste la posizione, usiamo l'angolo medio del continente
+        if (!angle && angles) angle = angles.mid;
+        if (!angle) return;
+
+        const r = map(v.year, state.globalYearRange.min, state.globalYearRange.max,
+                     CONFIG.layout.minRadius, CONFIG.layout.maxRadius);
+
+        const x = cos(angle) * r;
+        const y = sin(angle) * r;
+
+        const isHighlighted = (state.timelineYear !== null && v.year === state.timelineYear);
+        const isHovered = (state.hoveredVolcano === v);
+
+        if (isHighlighted || isHovered) {
+            drawVolcanoGlow(v, x, y);
+        }
+        drawVolcanoDot(x, y, isHighlighted, isHovered);
+    });
+}
+
+function drawVolcanoGlow(volcano, x, y) {
+    const glowSize = map(volcano.impact, 5, 15, 35, 55);
+    const alpha = map(volcano.impact, 5, 15, 33, 55);
+    
+    fill(255, 69, 0, alpha);
+    noStroke();
+    circle(x, y, glowSize);
+}
+
+function drawVolcanoDot(x, y, isHighlighted, isHovered) {
     if (isHighlighted) {
         fill(CONFIG.colors.highlightGlow);
     } else if (isHovered) {
@@ -541,25 +437,27 @@ function drawVolcanoDot(volcano, x, y, isHighlighted, isHovered) { //disegna il 
     circle(x, y, isHighlighted ? 6 : 4);
 }
 
-function drawContinentLabels() { //Disegna le etichette dei continenti attorno al cerchio principale dei vulcani.
+function drawContinentLabels() {
     CONTINENTS.forEach(cont => {
-        let angles = state.continentAngles[cont];
+        const angles = state.continentAngles[cont];
         if (!angles) return;
         
-        let angle = angles.mid;
-        let r = CONFIG.layout.maxRadius + 50;
-        let x = state.centerX + cos(angle) * r;
-        let y = state.centerY + sin(angle) * r;
+        const angle = angles.mid;
+        const r = CONFIG.layout.maxRadius + 50;
+        const x = state.centerX + cos(angle) * r;
+        const y = state.centerY + sin(angle) * r;
         
-        drawContinentBullet(x, y, cont); //definito qui sotto
-        drawContinentLabel(x, y, cont); //definito appena sotto
+        drawContinentBullet(x, y, cont);
+        drawContinentLabel(x, y, cont);
     });
 }
 
 function drawContinentBullet(x, y, continent) {
-    let isSelected = (state.selectedContinent === continent);
+    const isSelected = (state.selectedContinent === continent);
+    
     if (isSelected) {
         fill(CONFIG.colors.accent);
+        noStroke();
     } else {
         stroke(CONFIG.colors.accent);
         strokeWeight(2);
@@ -569,80 +467,33 @@ function drawContinentBullet(x, y, continent) {
 }
 
 function drawContinentLabel(x, y, continent) {
-    let isSelected = (state.selectedContinent === continent);
+    const isSelected = (state.selectedContinent === continent);
     fill(isSelected ? CONFIG.colors.accent : CONFIG.colors.text);
     noStroke();
     textSize(14);
     textAlign(LEFT, CENTER);
     text(continent, x - 10, y);
-    
 }
 
-//LINEA DEL TEMPO// la odio
-function getEruptionYears() {
-    const years = [...new Set(state.filteredData.map(v => v.year))];
-    years.sort((a, b) => a - b);
-    return years;
-}
-
-// Converte l'anno in una posizione Y sulla timeline
-function getYearPosition(year, tlY, tlH) {
-    const years = getEruptionYears();
-    if (years.length <= 1) return tlY;
-    
-    const minYear = years[0];
-    const maxYear = years[years.length - 1];
-    
-    // Calcola la posizione in base all'anno (più recente in alto, più vecchio in basso)
-    const normalized = (year - minYear) / (maxYear - minYear);
-    return tlY + (1 - normalized) * tlH; // Invertito per avere i recenti in alto
-}
-
-// Converte una posizione Y in un anno (per l'interazione col mouse)
-function getYearFromPosition(yPos, tlY, tlH) {
-    const years = getEruptionYears();
-    if (years.length === 0) return null;
-    
-    const minYear = years[0];
-    const maxYear = years[years.length - 1];
-    
-    // Calcola l'anno in base alla posizione Y
-    const normalized = 1 - ((yPos - tlY) / tlH); // Invertito per avere i recenti in alto
-    const year = minYear + normalized * (maxYear - minYear);
-    
-    // Trova l'anno più vicino nella lista degli anni disponibili
-    let closestYear = years[0];
-    let minDiff = Math.abs(year - closestYear);
-    
-    for (let i = 1; i < years.length; i++) {
-        const diff = Math.abs(year - years[i]);
-        if (diff < minDiff) {
-            minDiff = diff;
-            closestYear = years[i];
-        }
-    }
-    
-    return closestYear;
-}
-
-// Disegna l'intera timeline verticale
+// ===== TIMELINE =====
 function drawTimeline() {
-    let tlX = width - CONFIG.layout.timelineWidth;
-    let tlY = 100;
-    let tlH = height - 200;
+    const tlX = width - CONFIG.layout.timelineWidth;
+    const tlY = 100;
+    const tlH = height - 200;
 
-    // linea verticale principale
     stroke(CONFIG.colors.timeline);
     strokeWeight(2);
     line(tlX, tlY, tlX, tlY + tlH);
 
-    if (state.filteredData.length === 0) return;
-
-    drawTimelineTicks(tlX, tlY, tlH);
-    drawTimelineSlider(tlX, tlY, tlH);
+    // Mostra i ticks della timeline solo se ci sono dati
+    if (state.filteredData.length > 0) {
+        drawTimelineTicks(tlX, tlY, tlH);
+        if (state.timelineYear !== null) {
+            drawTimelineSlider(tlX, tlY, tlH);
+        }
+    }
 }
 
-// Disegna i due pallini agli estremi della timeline
 function drawTimelineTicks(tlX, tlY, tlH) {
     const years = getEruptionYears();
     if (years.length === 0) return;
@@ -650,40 +501,31 @@ function drawTimelineTicks(tlX, tlY, tlH) {
     fill(CONFIG.colors.timeline);
     noStroke();
 
-    // Primo anno (più recente) - in alto
     circle(tlX, getYearPosition(years[0], tlY, tlH), 8);
-    
-    // Ultimo anno (più vecchio) - in basso
     circle(tlX, getYearPosition(years[years.length - 1], tlY, tlH), 8);
 }
 
-// Disegna lo slider dell'anno selezionato
 function drawTimelineSlider(tlX, tlY, tlH) {
-    if (state.timelineYear === null) return;
-
     const yPos = getYearPosition(state.timelineYear, tlY, tlH);
 
-    // Linea orizzontale che collega lo slider alla timeline
     stroke(CONFIG.colors.accent);
     strokeWeight(1);
     line(tlX - 20, yPos, tlX, yPos);
 
-    // Cerchio dello slider
     fill(CONFIG.colors.accent);
     noStroke();
     circle(tlX - 20, yPos, 15);
 
-    // Testo dell'anno selezionato
     textSize(16);
     fill(CONFIG.colors.accent);
     textAlign(LEFT, CENTER);
     text(formatYear(state.timelineYear), tlX + 10, yPos);
 }
 
-// Disegna il testo del conteggio eruzioni
 function drawSelectedYear() {
-    if (state.timelineYear !== null) {
-        let eruptionsCount = state.filteredData.filter(v => v.year === state.timelineYear).length;
+    // Mostra il conteggio solo se ci sono dati e un anno selezionato
+    if (state.timelineYear !== null && state.filteredData.length > 0) {
+        const eruptionsCount = state.filteredData.filter(v => v.year === state.timelineYear).length;
         if (eruptionsCount > 0) {
             fill(CONFIG.colors.text);
             textSize(14);
@@ -693,159 +535,119 @@ function drawSelectedYear() {
     }
 }
 
-// Gestisce tutte le interazioni con la timeline
-function handleTimelineInteraction() {
-    let tlX = width - CONFIG.layout.timelineWidth;
-    let tlY = 100;
-    let tlH = height - 200;
-
-    // Area di interazione più ampia e intuitiva
-    const interactionArea = {
-        left: tlX - 50,    // 50px a sinistra della timeline
-        right: tlX + 50,   // 50px a destra della timeline  
-        top: tlY,
-        bottom: tlY + tlH
-    };
-
-    // Controlla se il mouse è nell'area di interazione
-    if (mouseX >= interactionArea.left && 
-        mouseX <= interactionArea.right && 
-        mouseY >= interactionArea.top && 
-        mouseY <= interactionArea.bottom) {
-        
-        updateTimelineFromMouse(tlX, tlY, tlH);
-    }
+function getEruptionYears() {
+    return [...new Set(state.filteredData.map(v => v.year))].sort((a, b) => a - b);
 }
 
-// Aggiorna la timeline in base alla posizione del mouse
-function updateTimelineFromMouse(tlX, tlY, tlH) {
+function getYearPosition(year, tlY, tlH) {
     const years = getEruptionYears();
-    if (years.length === 0) return;
-
-    // Converti la posizione Y del mouse in un anno
-    const selectedYear = getYearFromPosition(mouseY, tlY, tlH);
+    if (years.length <= 1) return tlY;
     
-    if (selectedYear !== null) {
-        state.timelineYear = selectedYear;
-    }
+    const minYear = years[0];
+    const maxYear = years[years.length - 1];
+    const normalized = (year - minYear) / (maxYear - minYear);
+    return tlY + (1 - normalized) * tlH;
 }
 
-// Funzione per il drag del mouse (aggiungi al tuo codice principale)
-function mouseDragged() {
-    handleTimelineInteraction();
+function getYearFromPosition(yPos, tlY, tlH) {
+    const years = getEruptionYears();
+    if (years.length === 0) return null;
+    
+    const minYear = years[0];
+    const maxYear = years[years.length - 1];
+    const normalized = 1 - ((yPos - tlY) / tlH);
+    const year = minYear + normalized * (maxYear - minYear);
+    
+    return years.reduce((closest, current) => {
+        return Math.abs(current - year) < Math.abs(closest - year) ? current : closest;
+    });
 }
-
-// Funzione per il click del mouse (aggiungi al tuo codice principale)
-function mousePressed() {
-    handleTimelineInteraction();
-}
-   
 
 // ===== INTERAZIONI =====
-function checkHover() { //Controlla se il mouse è sopra un vulcano e aggiorna lo stato. è praticamente la rova dell'hover come funziona. quindi il calcolo della distanza ecc.
+function checkHover() {
     if (state.filteredData.length === 0) {
         state.hoveredVolcano = null;
         return;
     }
     
-    let yearRange = getYearRange();
-    let foundHover = false;
-    
-    for (let v of state.filteredData) {
-        let angles = state.continentAngles[v.continent];
-        if (!angles) continue;
+    state.hoveredVolcano = state.filteredData.find(v => {
+        const angles = state.continentAngles[v.continent];
+        if (!angles) return false;
         
-        let key = v.name + v.year;
-        let angle = state.volcanoPositions.get(key) || angles.mid;
-        let r = map(v.year, yearRange.min, yearRange.max, CONFIG.layout.minRadius, CONFIG.layout.maxRadius);
-        let x = state.centerX + cos(angle) * r;
-        let y = state.centerY + sin(angle) * r;
-        let d = dist(mouseX, mouseY, x, y);
+        const key = v.name + v.year;
+        // MODIFICA: Usiamo la posizione fissa dalla mappa invece di ricalcolarla
+        const angle = state.volcanoPositions.get(key) || angles.mid;
+        const r = map(v.year, state.globalYearRange.min, state.globalYearRange.max, 
+                     CONFIG.layout.minRadius, CONFIG.layout.maxRadius);
+        const x = state.centerX + cos(angle) * r;
+        const y = state.centerY + sin(angle) * r;
         
-        if (d < 8) {
-            state.hoveredVolcano = v;
-            foundHover = true;
-            break;
-        }
-    }
-    
-    if (!foundHover) {
-        state.hoveredVolcano = null;
-    }
+        return dist(mouseX, mouseY, x, y) < 8;
+    }) || null;
 }
 
-function mousePressed() { //viene chiamata automaticamente da p5.js quando premi il mouse. Controlla se hai cliccato su un secolo, un continente o la timeline.
-    handleCenturySelection(); //vedi punto 4
+function mousePressed() {
+    handleCenturySelection();
     handleContinentSelection();
     handleTimelineInteraction();
 }
 
-function mouseDragged() { //quando trascini il mouse. Permette di spostare lo slider della timeline anche trascinando.
+function mouseDragged() {
     handleTimelineInteraction();
 }
 
-function handleCenturySelection() { //NON FUNZIONA UN CAZZO
-    // Calcolo dinamico della posizione del riquadro dei secoli
-    const boxX = width * 0.05;   // 5% da sinistra
-    const boxY = height * 0.6;   // 60% dall'alto
-    const checkYStart = boxY + 50;
-    const checkSpacing = 24;
-    const column1X = boxX + 20;
-    const column2X = boxX + 160;
-    const checkboxSize = 20; // Hitbox più grande per sicurezza
+function handleCenturySelection() {
+    const boxX = 60, boxY = 640;
+    const checkYStart = boxY + 60;
+    const checkSpacing = 30;
+    const column1X = boxX + 30;
+    const column2X = boxX + 180;
 
     CONFIG.centuries.forEach((century, i) => {
         const column = i < 5 ? column1X : column2X;
         const row = i < 5 ? i : i - 5;
         const cy = checkYStart + row * checkSpacing;
 
-        // Controllo se il mouse è dentro la hitbox del checkbox
-        if (mouseX >= column && mouseX <= column + checkboxSize &&
-            mouseY >= cy && mouseY <= cy + checkboxSize) {
-            // Toggle selezione se il secolo era già selezionato
+        if (mouseX >= column && mouseX <= column + 15 &&
+            mouseY >= cy && mouseY <= cy + 15) {
             state.selectedCentury = (state.selectedCentury === century.value) ? null : century.value;
             applyFilters();
         }
     });
 }
 
-function handleContinentSelection() { //Cicla su tutti i continenti. Calcola posizione (x, y) della etichetta / pallino del continente. Controlla se il mouse è vicino (distanza < 10px). Se sì →  selezione continente e aggiorna filtri.
+function handleContinentSelection() {
     CONTINENTS.forEach(cont => {
-        let angles = state.continentAngles[cont];
+        const angles = state.continentAngles[cont];
         if (!angles) return;
         
-        let angle = angles.mid;
-        let r = CONFIG.layout.maxRadius + 50;
-        let x = state.centerX + cos(angle) * r;
-        let y = state.centerY + sin(angle) * r;
+        const angle = angles.mid;
+        const r = CONFIG.layout.maxRadius + 50;
+        const x = state.centerX + cos(angle) * r;
+        const y = state.centerY + sin(angle) * r;
         
-        let d = dist(mouseX, mouseY, x - 30, y);
-        if (d < 10) {
+        if (dist(mouseX, mouseY, x - 30, y) < 10) {
             state.selectedContinent = (state.selectedContinent === cont) ? null : cont;
             applyFilters();
         }
     });
 }
 
-function handleTimelineInteraction() { //controlla se il mouse è sopra la linea del tempo
-    let tlX = width - CONFIG.layout.timelineWidth;
-    let tlY = 100;
-    let tlH = height - 200;
-    
-    if (mouseX > tlX - 20 && mouseX < tlX + 20 && mouseY > tlY && mouseY < tlY + tlH) {
-        updateTimeline();
-    }
-}
+function handleTimelineInteraction() {
+    const tlX = width - CONFIG.layout.timelineWidth;
+    const tlY = 100;
+    const tlH = height - 200;
 
-function updateTimeline() { //Limita il mouse alla zona verticale della timeline. Converte la posizione Y del mouse in un anno usando map() (da Y → anno)
-    if (state.filteredData.length === 0) return;
-    
-    let tlY = 100;
-    let tlH = height - 200;
-    let yearRange = getYearRange();
-    
-    let y = constrain(mouseY, tlY, tlY + tlH);
-    state.timelineYear = Math.round(map(y, tlY + tlH, tlY, yearRange.min, yearRange.max));
+    // Interagisci con la timeline solo se ci sono dati
+    if (state.filteredData.length > 0 && 
+        mouseX >= tlX - 50 && mouseX <= tlX + 50 && 
+        mouseY >= tlY && mouseY <= tlY + tlH) {
+        
+        const selectedYear = getYearFromPosition(mouseY, tlY, tlH);
+        if (selectedYear !== null) {
+            state.timelineYear = selectedYear;
+        }
+    }
 }
 
 // ===== UTILITIES =====
