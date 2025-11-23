@@ -21,17 +21,24 @@ const CONFIG = {
     },
     centuries: [
         { label: 'tutti i secoli', value: null },
-        { label: '4000 a.C.', value: -4000 },
-        { label: '2000 a.C.', value: -2000 },
-        { label: '0', value: 0 },
-        { label: '1000 d.C.', value: 1000 },
+        { label: '4400 a.C.', value: -4400 },
+        { label: '3400 a.C.', value: -3400 },
+        { label: '2400 a.C.', value: -2400 },
+        { label: '1400 a.C.', value: -1400 },
+        { label: '400 a.C.', value: -400 },
+        { label: '600 d.C.', value: 600 },
         { label: '1600 d.C.', value: 1600 },
-        { label: '1700 d.C.', value: 1700 },
         { label: '1800 d.C.', value: 1800 },
+        { label: '1850 d.C.', value: 1850 },
         { label: '1900 d.C.', value: 1900 },
+        { label: '1950 d.C.', value: 1950 },
         { label: '2000 d.C.', value: 2000 },
+        { label: '2050 d.C.', value: 2050 }
     ]
 };
+
+// MODIFICA: Aggiungiamo la configurazione degli anni per i cerchi concentrici
+const CONCENTRIC_YEARS = [-4400, -3400, -2400, -1400, -400, 600, 1600, 1800, 1850, 1900, 1950, 2000, 2050];
 
 // ===== STATO APPLICAZIONE =====
 let state = {
@@ -96,6 +103,8 @@ function processTableData(table) {
         let row = table.getRow(r);
         let location = row.getString('Location');
         
+        let deaths = parseInt(row.getString('Deaths')) || 0;
+        
         state.volcanoData.push({
             year: parseInt(row.getString('Year')) || 0,
             name: row.getString('Name'),
@@ -103,6 +112,7 @@ function processTableData(table) {
             country: row.getString('Country'),
             type: row.getString('Type'),
             impact: parseInt(row.getString('Impact')) || 1,
+            deaths: deaths,
             continent: CONTINENT_MAP[location] || 'Sconosciuto'
         });
     }
@@ -159,18 +169,13 @@ function calculateContinentData() {
     });
 }
 
-// MODIFICA CRUCIALE: Calcoliamo le posizioni dei vulcani UNA SOLA VOLTA all'inizializzazione
-// e non ogni volta che applichiamo i filtri. Questo garantisce che le posizioni rimangano consistenti.
 function calculateVolcanoPositions() {
     state.volcanoPositions.clear();
     
-    // MODIFICA: Usiamo state.volcanoData (tutti i dati) invece di state.filteredData
-    // in modo che le posizioni siano calcolate una volta per tutte e non cambino con i filtri
     state.volcanoData.forEach(v => {
-        let key = v.name + v.year;
+        let key = `${v.name}-${v.year}-${v.deaths}`;
         let angles = state.continentAngles[v.continent];
         if (angles && !state.volcanoPositions.has(key)) {
-            // Assegniamo un angolo casuale ma FISSO per ogni vulcano all'interno del suo continente
             state.volcanoPositions.set(key, random(angles.start, angles.end));
         }
     });
@@ -186,9 +191,6 @@ function applyFilters() {
     });
 
     calculateContinentData();
-    // MODIFICA IMPORTANTE: Rimossa la chiamata a calculateVolcanoPositions()
-    // Le posizioni dei vulcani rimangono quelle calcolate all'inizializzazione
-    // state.timelineYear = null; // Nota: questa riga era commentata nel codice originale?
     state.timelineYear = null;
 }
 
@@ -198,6 +200,33 @@ function getGlobalYearRange() {
         min: Math.min(...years),
         max: Math.max(...years)
     };
+}
+
+// MODIFICA CRUCIALE: Nuova funzione per mappare l'anno a un raggio basato sugli anni concentrici
+function getRadiusForYear(year) {
+    // Trova l'indice dell'anno nel nostro array di anni concentrici
+    for (let i = 0; i < CONCENTRIC_YEARS.length - 1; i++) {
+        if (year >= CONCENTRIC_YEARS[i] && year < CONCENTRIC_YEARS[i + 1]) {
+            // Calcola la proporzione tra i due anni concentrici
+            const yearRange = CONCENTRIC_YEARS[i + 1] - CONCENTRIC_YEARS[i];
+            const yearsFromStart = year - CONCENTRIC_YEARS[i];
+            const proportion = yearsFromStart / yearRange;
+            
+            // Calcola il raggio corrispondente
+            const radiusStep = (CONFIG.layout.maxRadius - CONFIG.layout.minRadius) / (CONCENTRIC_YEARS.length - 1);
+            const startRadius = CONFIG.layout.minRadius + i * radiusStep;
+            const endRadius = CONFIG.layout.minRadius + (i + 1) * radiusStep;
+            
+            return startRadius + proportion * (endRadius - startRadius);
+        }
+    }
+    
+    // Se l'anno è prima del primo anno concentric o dopo l'ultimo
+    if (year < CONCENTRIC_YEARS[0]) {
+        return CONFIG.layout.minRadius;
+    } else {
+        return CONFIG.layout.maxRadius;
+    }
 }
 
 // ===== RENDERING =====
@@ -252,7 +281,8 @@ function drawVolcanoInfo(boxX, boxY) {
         { label: 'ultima eruzione', value: formatYear(v.year) },
         { label: 'paese', value: v.country || 'N/A' },
         { label: 'tipo', value: v.type || 'N/A' },
-        { label: 'conseguenze', value: v.impact || '1' }
+        { label: 'conseguenze', value: v.impact || '1' },
+        { label: 'numero morti', value: v.deaths || '0' }
     ];
     
     textSize(14);
@@ -286,13 +316,16 @@ function drawCenturySelector() {
 function drawCenturyCheckboxes(boxX, boxY) {
     const checkY = boxY + 60;
     const checkSpacing = 30;
+    const column1X = boxX + 30;
+    const column2X = boxX + 180;
+    const itemsPerColumn = Math.ceil(CONFIG.centuries.length / 2);
     
     textSize(11);
     fill(CONFIG.colors.text);
     
     CONFIG.centuries.forEach((century, i) => {
-        const column = i < 5 ? boxX + 30 : boxX + 180;
-        const row = i < 5 ? i : i - 5;
+        const column = i < itemsPerColumn ? column1X : column2X;
+        const row = i < itemsPerColumn ? i : i - itemsPerColumn;
         const cy = checkY + row * checkSpacing;
         const isSelected = (century.value === state.selectedCentury);
         
@@ -319,23 +352,20 @@ function drawMainCircle() {
     push();
     translate(state.centerX, state.centerY);
     
-    // SEMPRE disegna questi elementi, anche quando non ci sono vulcani filtrati
     drawSelectedContinentSlice();
     drawConcentricCircles();
     drawContinentDividers();
     
-    // Disegna i vulcani solo se ce ne sono
     if (state.filteredData.length > 0) {
         drawVolcanoes();
     }
     
     pop();
     
-    // Controlla hover solo se ci sono vulcani
     if (state.filteredData.length > 0) {
         checkHover();
     } else {
-        state.hoveredVolcano = null; // Reset hover se non ci sono vulcani
+        state.hoveredVolcano = null;
     }
 }
 
@@ -352,15 +382,15 @@ function drawSelectedContinentSlice() {
 }
 
 function drawConcentricCircles() {
-    const customYears = [-4000, -2000, 0, 1000, 1600, 1700, 1800, 1900, 2000];
-    const n = customYears.length;
+    // MODIFICA: Usiamo CONCENTRIC_YEARS invece di hardcodare gli anni
+    const n = CONCENTRIC_YEARS.length;
     const radiusStep = (CONFIG.layout.maxRadius - CONFIG.layout.minRadius) / (n - 1);
 
     stroke(CONFIG.colors.circle);
     strokeWeight(0.5);
     noFill();
 
-    customYears.forEach((year, i) => {
+    CONCENTRIC_YEARS.forEach((year, i) => {
         const r = CONFIG.layout.minRadius + i * radiusStep;
         circle(0, 0, r * 2);
 
@@ -391,17 +421,15 @@ function drawContinentDividers() {
 
 function drawVolcanoes() {
     state.filteredData.forEach(v => {
-        // MODIFICA: Recuperiamo la posizione dalla mappa calcolata all'inizializzazione
-        // Questo garantisce che la posizione rimanga la stessa anche quando applichiamo filtri
-        let angle = state.volcanoPositions.get(v.name + v.year);
+        let key = `${v.name}-${v.year}-${v.deaths}`;
+        let angle = state.volcanoPositions.get(key);
         const angles = state.continentAngles[v.continent];
         
-        // Se per qualche motivo non esiste la posizione, usiamo l'angolo medio del continente
         if (!angle && angles) angle = angles.mid;
         if (!angle) return;
 
-        const r = map(v.year, state.globalYearRange.min, state.globalYearRange.max,
-                     CONFIG.layout.minRadius, CONFIG.layout.maxRadius);
+        // MODIFICA IMPORTANTE: Usiamo la nuova funzione getRadiusForYear invece della mappatura lineare
+        const r = getRadiusForYear(v.year);
 
         const x = cos(angle) * r;
         const y = sin(angle) * r;
@@ -485,7 +513,6 @@ function drawTimeline() {
     strokeWeight(2);
     line(tlX, tlY, tlX, tlY + tlH);
 
-    // Mostra i ticks della timeline solo se ci sono dati
     if (state.filteredData.length > 0) {
         drawTimelineTicks(tlX, tlY, tlH);
         if (state.timelineYear !== null) {
@@ -523,7 +550,6 @@ function drawTimelineSlider(tlX, tlY, tlH) {
 }
 
 function drawSelectedYear() {
-    // Mostra il conteggio solo se ci sono dati e un anno selezionato
     if (state.timelineYear !== null && state.filteredData.length > 0) {
         const eruptionsCount = state.filteredData.filter(v => v.year === state.timelineYear).length;
         if (eruptionsCount > 0) {
@@ -574,11 +600,10 @@ function checkHover() {
         const angles = state.continentAngles[v.continent];
         if (!angles) return false;
         
-        const key = v.name + v.year;
-        // MODIFICA: Usiamo la posizione fissa dalla mappa invece di ricalcolarla
+        const key = `${v.name}-${v.year}-${v.deaths}`;
         const angle = state.volcanoPositions.get(key) || angles.mid;
-        const r = map(v.year, state.globalYearRange.min, state.globalYearRange.max, 
-                     CONFIG.layout.minRadius, CONFIG.layout.maxRadius);
+        // MODIFICA: Anche qui usiamo getRadiusForYear per coerenza
+        const r = getRadiusForYear(v.year);
         const x = state.centerX + cos(angle) * r;
         const y = state.centerY + sin(angle) * r;
         
@@ -602,10 +627,11 @@ function handleCenturySelection() {
     const checkSpacing = 30;
     const column1X = boxX + 30;
     const column2X = boxX + 180;
+    const itemsPerColumn = Math.ceil(CONFIG.centuries.length / 2);
 
     CONFIG.centuries.forEach((century, i) => {
-        const column = i < 5 ? column1X : column2X;
-        const row = i < 5 ? i : i - 5;
+        const column = i < itemsPerColumn ? column1X : column2X;
+        const row = i < itemsPerColumn ? i : i - itemsPerColumn;
         const cy = checkYStart + row * checkSpacing;
 
         if (mouseX >= column && mouseX <= column + 15 &&
@@ -638,7 +664,6 @@ function handleTimelineInteraction() {
     const tlY = 100;
     const tlH = height - 200;
 
-    // Interagisci con la timeline solo se ci sono dati
     if (state.filteredData.length > 0 && 
         mouseX >= tlX - 50 && mouseX <= tlX + 50 && 
         mouseY >= tlY && mouseY <= tlY + tlH) {
@@ -652,7 +677,7 @@ function handleTimelineInteraction() {
 
 // ===== UTILITIES =====
 function formatYear(year) {
-    return year + (year < 0 ? ' s.C.' : ' d.C.');
+    return year + (year < 0 ? ' a.C.' : ' d.C.');
 }
 
 function windowResized() {
