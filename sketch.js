@@ -473,7 +473,6 @@ function drawCenturyCheckboxes(boxX, checkYStart) {
     const column1X = boxX + 30;
     const column2X = boxX + 180;
     const itemsPerColumn = Math.ceil(CONFIG.centuries.length / 2);
-
     textSize(11);
 
     // Reset array delle posizioni
